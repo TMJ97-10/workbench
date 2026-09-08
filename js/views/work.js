@@ -40,7 +40,7 @@ function renderPlans(box) {
   const pct = plans.length ? Math.round(doneCnt / plans.length * 100) : 0;
 
   box.innerHTML = '';
-  box.append(
+  box.append(...[
     // 月份切换 + 新建
     el('div', { class: 'work-toolbar' },
       el('div', { class: 'work-month' },
@@ -71,7 +71,8 @@ function renderPlans(box) {
           el('div', { class: 'work-ops' },
             el('button', { class: 'btn btn-sm', onclick: () => planModal(p) }, icon('edit', 14)),
             el('button', { class: 'btn btn-sm btn-danger', onclick: async () => { if (await confirmBox(`删除计划「${p.title}」？`)) store.update(d => { d.work.plans = d.work.plans.filter(i => i.id !== p.id); }); } }, icon('trash', 14))))))
-      : emptyState('cal', `${monthLabel(curMonth)}还没有计划`, '点右上角「+ 新建计划」给这个月定个目标'));
+      : emptyState('cal', `${monthLabel(curMonth)}还没有计划`, '点右上角「+ 新建计划」给这个月定个目标'),
+  ].filter(Boolean));
 }
 
 // ---------------- 日工作完成情况 ----------------
