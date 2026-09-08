@@ -417,3 +417,21 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
   .prompt-item .pp{max-width:150px}
   .table-wrap{overflow-x:auto}
 }
+
+/* ---- 工作情况模块 ---- */
+.work-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.work-month{display:flex;align-items:center;gap:8px}
+.work-month-label{font-weight:700;font-size:15.5px;min-width:110px;text-align:center;font-variant-numeric:tabular-nums}
+.work-progress{padding:14px 16px;margin-bottom:14px}
+.work-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);margin-top:10px;overflow:hidden}
+.work-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s ease}
+.work-list{display:flex;flex-direction:column;gap:10px}
+.work-row{display:flex;align-items:flex-start;gap:12px;padding:13px 16px}
+.work-row.is-done .work-title{text-decoration:line-through;opacity:.55}
+.work-main{flex:1;min-width:0}
+.work-title{font-weight:600;font-size:14.5px;word-break:break-word}
+.work-ops{display:flex;gap:6px;flex-shrink:0}
+.work-check{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--text-3);background:transparent;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all .15s}
+.work-check:hover{border-color:var(--accent)}
+.work-check.on{background:var(--accent);border-color:var(--accent);color:#04202a}
+.work-today{padding:14px 16px;margin-bottom:14px}

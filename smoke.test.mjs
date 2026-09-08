@@ -40,6 +40,7 @@ assert(q.normCode('AAPL') === 'usAAPL' && q.normCode('aapl.oq') === 'usAAPL' && 
 // 3. store 合并与持仓计算
 const { store } = await import('./js/store.js');
 assert(store.data.stocks.watchlist.length === 3, '默认自选含三大指数');
+assert(store.data.work && Array.isArray(store.data.work.plans) && Array.isArray(store.data.work.logs), '工作情况数据结构');
 store.update(d => d.todos.push({ id: 't1', title: '测试', done: false, priority: 'mid', date: '2026-09-07', createdAt: 1 }));
 assert(JSON.parse(localStorage.getItem('workbench.data.v1')).todos.length === 1, 'update 立即写 localStorage');
 

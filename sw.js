@@ -2,7 +2,7 @@
 // 策略：页面导航 network-first（拿到新版本优先）；静态资源 stale-while-revalidate；
 // 外部接口（行情/天气/GitHub/热榜）不缓存，直接走网络，由应用层自己做降级。
 
-const CACHE = 'workbench-v1';
+const CACHE = 'workbench-v2';
 
 const SHELL = [
   './',
@@ -25,6 +25,7 @@ const SHELL = [
   './js/views/settings.js',
   './js/views/stocks.js',
   './js/views/todos.js',
+  './js/views/work.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

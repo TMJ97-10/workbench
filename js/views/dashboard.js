@@ -8,6 +8,7 @@ function go(id) { document.dispatchEvent(new CustomEvent('wb:nav', { detail: id 
 
 const ENTRIES = [
   { id: 'todos', icon: 'todo', name: '待办日程', desc: '待办清单与日程安排' },
+  { id: 'work', icon: 'briefcase', name: '工作情况', desc: '月工作计划与日完成' },
   { id: 'notes', icon: 'note', name: '笔记', desc: '标题正文标签搜索' },
   { id: 'ideas', icon: 'bulb', name: '灵感库', desc: '一句话灵感快记' },
   { id: 'ai', icon: 'ai', name: 'AI 助手', desc: 'Kimi / DeepSeek / 豆包 / ChatGPT' },

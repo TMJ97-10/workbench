@@ -25,6 +25,10 @@ function blankData() {
       ],
       notes: [],          // {id,code,title,body,updatedAt}
     },
+    work: {
+      plans: [],          // {id,month:'YYYY-MM',title,note,done,createdAt}
+      logs: [],           // {id,date:'YYYY-MM-DD',content,createdAt,updatedAt}
+    },
     settings: {},
   };
 }
@@ -46,6 +50,7 @@ function loadLocal() {
     merged.meta = { ...base.meta, ...(parsed.meta || {}) };
     merged.learning = { ...base.learning, ...(parsed.learning || {}) };
     merged.stocks = { ...base.stocks, ...(parsed.stocks || {}) };
+    merged.work = { ...base.work, ...(parsed.work || {}) };
     return merged;
   } catch { return blankData(); }
 }
@@ -83,6 +88,7 @@ export const store = {
     merged.meta = { ...base.meta, ...(remote.meta || {}) };
     merged.learning = { ...base.learning, ...(remote.learning || {}) };
     merged.stocks = { ...base.stocks, ...(remote.stocks || {}) };
+    merged.work = { ...base.work, ...(remote.work || {}) };
     this.data = merged;
     this.saveLocal();
     this.emitChange('remote');

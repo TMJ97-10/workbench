@@ -4,6 +4,7 @@ import { store } from './store.js';
 
 import * as dashboard from './views/dashboard.js';
 import * as todos from './views/todos.js';
+import * as work from './views/work.js';
 import * as notes from './views/notes.js';
 import * as ideas from './views/ideas.js';
 import * as ai from './views/ai.js';
@@ -16,6 +17,7 @@ import * as settings from './views/settings.js';
 const VIEWS = [
   { id: 'dashboard', name: '首页', icon: 'home', mod: dashboard },
   { id: 'todos', name: '待办日程', icon: 'todo', mod: todos },
+  { id: 'work', name: '工作情况', icon: 'briefcase', mod: work },
   { id: 'notes', name: '笔记', icon: 'note', mod: notes },
   { id: 'ideas', name: '灵感库', icon: 'bulb', mod: ideas },
   { id: 'ai', name: 'AI 助手', icon: 'ai', mod: ai },
