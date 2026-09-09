@@ -43,6 +43,8 @@ const ICON_PATHS = {
   briefcase: '<rect x="3" y="7" width="18" height="14" rx="3"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 12.5h18"/>',
   check: '<path d="m4 12.5 5 5L20 6.5"/>',
   cloud: '<path d="M7 18a5 5 0 0 1-.9-9.9A6 6 0 0 1 17.7 9 4.5 4.5 0 0 1 17 18z"/>',
+  down: '<path d="M12 3v12m0 0 5-5m-5 5-5-5"/><path d="M4 19h16"/>',
+  up: '<path d="M12 15V3m0 0 5 5m-5-5-5 5"/><path d="M4 19h16"/>',
 };
 export function icon(name, size) {
   const s = size || 18;

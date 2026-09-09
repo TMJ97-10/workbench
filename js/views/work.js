@@ -1,6 +1,9 @@
 // ============ 工作情况：月工作计划 + 日工作完成情况 ============
 import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, todayStr, fmtDateTime, toast, uid, WEEK_CN } from '../util.js';
 import { store } from '../store.js';
+import { exportExcel, pickExcelRows, asText, asMonth, asDate, asDone } from '../excel.js';
+
+const XLSX_BTN = 'display:inline-flex;align-items:center;gap:5px';
 
 const pad = n => String(n).padStart(2, '0');
 function monthStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
@@ -17,6 +20,89 @@ function shiftMonth(m, delta) {
 function dateLabel(ds) {
   const d = new Date(ds + 'T00:00:00');
   return `${ds} 星期${WEEK_CN[d.getDay()]}`;
+}
+
+// ---------------- Excel 导出 / 导入 ----------------
+async function exportPlans() {
+  try {
+    const plans = [...store.data.work.plans].sort((a, b) => a.month.localeCompare(b.month) || a.createdAt - b.createdAt);
+    if (!plans.length) { toast('还没有计划可导出', 'err'); return; }
+    const aoa = [['月份', '计划内容', '备注', '是否完成', '创建时间']];
+    plans.forEach(p => aoa.push([p.month, p.title, p.note || '', p.done ? '已完成' : '未完成', fmtDateTime(p.createdAt)]));
+    await exportExcel(`月工作计划-${todayStr()}.xlsx`, '月工作计划', aoa, [10, 42, 42, 10, 18]);
+    toast(`已导出 ${plans.length} 条计划`);
+  } catch (e) { toast(e.message || '导出失败', 'err'); }
+}
+
+async function importPlans(box) {
+  try {
+    const rows = await pickExcelRows();
+    if (!rows) return;
+    const data = rows.filter(r => r.some(c => asText(c) !== ''));
+    if (data.length < 2) { toast('表格里没有可导入的数据', 'err'); return; }
+    const head = data[0].map(asText);
+    const colOf = (...names) => head.findIndex(h => names.some(n => h.includes(n)));
+    const cMonth = colOf('月份', '月度'), cTitle = colOf('计划', '内容', '目标'), cNote = colOf('备注', '说明'), cDone = colOf('完成');
+    if (cTitle < 0) { toast('没认出「计划内容」列，请确认第一行是表头', 'err'); return; }
+    let added = 0, updated = 0, skipped = 0;
+    store.update(d => {
+      data.slice(1).forEach(r => {
+        const title = asText(r[cTitle]);
+        if (!title) { skipped++; return; }
+        const m = (cMonth >= 0 ? asMonth(r[cMonth]) : null) || curMonth;
+        const note = cNote >= 0 ? asText(r[cNote]) : '';
+        const doneCell = cDone >= 0 ? asText(r[cDone]) : '';
+        const hit = d.work.plans.find(p => p.month === m && p.title === title);
+        if (hit) {
+          if (note) hit.note = note;
+          if (doneCell) hit.done = asDone(r[cDone]);
+          updated++;
+        } else {
+          d.work.plans.push({ id: uid(), month: m, title, note, done: doneCell ? asDone(doneCell) : false, createdAt: Date.now() });
+          added++;
+        }
+      });
+    });
+    toast(`导入完成：新增 ${added} 条` + (updated ? `，更新 ${updated} 条` : '') + (skipped ? `，跳过 ${skipped} 行` : ''));
+    if (tab === 'plans') renderPlans(box);
+  } catch (e) { toast(e.message || '导入失败', 'err'); }
+}
+
+async function exportLogs() {
+  try {
+    const logs = [...store.data.work.logs].sort((a, b) => a.date.localeCompare(b.date));
+    if (!logs.length) { toast('还没有记录可导出', 'err'); return; }
+    const aoa = [['日期', '完成情况', '更新时间']];
+    logs.forEach(l => aoa.push([l.date, l.content, fmtDateTime(l.updatedAt)]));
+    await exportExcel(`日工作完成情况-${todayStr()}.xlsx`, '日工作完成情况', aoa, [14, 60, 18]);
+    toast(`已导出 ${logs.length} 条记录`);
+  } catch (e) { toast(e.message || '导出失败', 'err'); }
+}
+
+async function importLogs(box) {
+  try {
+    const rows = await pickExcelRows();
+    if (!rows) return;
+    const data = rows.filter(r => r.some(c => asText(c) !== ''));
+    if (data.length < 2) { toast('表格里没有可导入的数据', 'err'); return; }
+    const head = data[0].map(asText);
+    const colOf = (...names) => head.findIndex(h => names.some(n => h.includes(n)));
+    const cDate = colOf('日期'), cContent = colOf('完成情况', '内容', '记录');
+    if (cDate < 0 || cContent < 0) { toast('没认出「日期」或「完成情况」列，请确认第一行是表头', 'err'); return; }
+    let added = 0, updated = 0, skipped = 0;
+    store.update(d => {
+      data.slice(1).forEach(r => {
+        const date = asDate(r[cDate]);
+        const content = asText(r[cContent]);
+        if (!date || !content) { skipped++; return; }
+        const hit = d.work.logs.find(l => l.date === date);
+        if (hit) { hit.content = content; hit.updatedAt = Date.now(); updated++; }
+        else { d.work.logs.push({ id: uid(), date, content, createdAt: Date.now(), updatedAt: Date.now() }); added++; }
+      });
+    });
+    toast(`导入完成：新增 ${added} 条` + (updated ? `，覆盖 ${updated} 条` : '') + (skipped ? `，跳过 ${skipped} 行` : ''));
+    if (tab === 'logs') renderLogs(box);
+  } catch (e) { toast(e.message || '导入失败', 'err'); }
 }
 
 // ---------------- 月工作计划 ----------------
@@ -48,7 +134,10 @@ function renderPlans(box) {
         el('span', { class: 'work-month-label' }, monthLabel(curMonth)),
         el('button', { class: 'btn btn-sm', onclick: () => { curMonth = shiftMonth(curMonth, 1); renderPlans(box); } }, '›'),
         curMonth !== monthStr() ? el('button', { class: 'btn btn-sm', onclick: () => { curMonth = monthStr(); renderPlans(box); } }, '回本月') : null),
-      el('button', { class: 'btn btn-primary', onclick: () => planModal() }, '+ 新建计划')),
+      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end' },
+        el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: exportPlans }, icon('down', 14), '导出 Excel'),
+        el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: () => importPlans(box) }, icon('up', 14), '导入 Excel'),
+        el('button', { class: 'btn btn-primary', onclick: () => planModal() }, '+ 新建计划'))),
 
     // 完成进度
     plans.length ? el('div', { class: 'card work-progress' },
@@ -118,7 +207,9 @@ function renderLogs(box) {
             toast('今天的工作已记录 ✓');
           }
         }, todayLog ? '更新今天的记录' : '保存今天的记录'),
-        el('button', { class: 'btn', onclick: () => logModal() }, '补记以往日期'))),
+        el('button', { class: 'btn', onclick: () => logModal() }, '补记以往日期'),
+        el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: exportLogs }, icon('down', 14), '导出 Excel'),
+        el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: () => importLogs(box) }, icon('up', 14), '导入 Excel'))),
 
     logs.length
       ? el('div', { class: 'work-list' }, logs.map(l =>

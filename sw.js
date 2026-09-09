@@ -2,7 +2,7 @@
 // 策略：页面导航 network-first（拿到新版本优先）；静态资源 stale-while-revalidate；
 // 外部接口（行情/天气/GitHub/热榜）不缓存，直接走网络，由应用层自己做降级。
 
-const CACHE = 'workbench-v3';
+const CACHE = 'workbench-v4';
 
 const SHELL = [
   './',
@@ -15,6 +15,7 @@ const SHELL = [
   './js/github.js',
   './js/quotes.js',
   './js/charts.js',
+  './js/excel.js',
   './js/views/ai.js',
   './js/views/dashboard.js',
   './js/views/ideas.js',
@@ -26,6 +27,7 @@ const SHELL = [
   './js/views/stocks.js',
   './js/views/todos.js',
   './js/views/work.js',
+  './vendor/xlsx.full.min.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
