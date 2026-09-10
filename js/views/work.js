@@ -272,7 +272,7 @@ function logBody(l) {
 // 把分类文本拆成事项条目（去掉“要求完成时间”等噪音行）
 function splitItems(text) {
   return (text || '').split(/[\n；;]+/).map(s => s.trim())
-    .filter(s => s && !/^要求完成时间/.test(s) && !/^考核/.test(s));
+    .filter(s => s.length >= 2 && !/：$/.test(s) && !/^要求完成时间/.test(s) && !/^考核/.test(s));
 }
 
 // 根据日工作完成情况自动整理月度总结（控制在 300 字左右）
@@ -304,6 +304,8 @@ function genSummary(m) {
     }
     if (added) out += para + '。';
   }
+  // 硬上限：超过 330 字时截断收尾，保证在 300 字左右
+  if (out.length > 330) out = out.slice(0, 328).replace(/[；;，,。、：:…]+$/, '') + '…';
   return out;
 }
 
