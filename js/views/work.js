@@ -17,7 +17,9 @@ const pad = n => String(n).padStart(2, '0');
 function monthStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
 
 let tab = 'plans';           // plans | logs
-let curMonth = monthStr();   // 当前查看的月份 YYYY-MM
+let curMonth = monthStr();   // 计划 tab 当前查看的月份 YYYY-MM
+let logMonth = monthStr();   // 日志 tab 当前浏览的月份 YYYY-MM
+let logQuery = '';           // 日志搜索关键词（非空时搜索全部记录）
 
 function monthLabel(m) { const [y, mm] = m.split('-'); return `${y} 年 ${Number(mm)} 月`; }
 function shiftMonth(m, delta) {
@@ -267,10 +269,95 @@ function logBody(l) {
   return parts;
 }
 
+// 把分类文本拆成事项条目（去掉“要求完成时间”等噪音行）
+function splitItems(text) {
+  return (text || '').split(/[\n；;]+/).map(s => s.trim())
+    .filter(s => s && !/^要求完成时间/.test(s) && !/^考核/.test(s));
+}
+
+// 根据日工作完成情况自动整理月度总结（控制在 300 字左右）
+function genSummary(m) {
+  const logs = store.data.work.logs.filter(l => l.date.startsWith(m)).sort((a, b) => a.date.localeCompare(b.date));
+  if (!logs.length) return '';
+  const focus = (store.data.work.focus || {})[m] || '';
+  const plans = store.data.work.plans.filter(p => p.month === m);
+  const doneCnt = plans.filter(p => p.done).length;
+  let out = `本月共 ${logs.length} 天有工作记录。`;
+  if (focus) out += `当月重点工作：${focus}。`;
+  if (plans.length) out += `月工作计划 ${plans.length} 项，完成 ${doneCnt} 项。`;
+  // 各分类事项按日期先后去重收集
+  const catItems = CATS.map(([k, label]) => {
+    const seen = new Set(); const items = [];
+    logs.forEach(l => splitItems(l[k] || (k === 'other' ? l.content : '')).forEach(it => {
+      if (!seen.has(it)) { seen.add(it); items.push(it); }
+    }));
+    return [label, items];
+  }).filter(([, items]) => items.length);
+  // 逐条追加，总量向 300 字收敛
+  for (const [label, items] of catItems) {
+    let para = `${label}：`; let added = 0;
+    for (const it of items) {
+      const next = para + (added ? '；' : '') + it;
+      if (out.length + next.length + 1 > 300 && added > 0) break; // 超 300 字且至少有一条就停
+      para = next; added++;
+      if (out.length + para.length + 1 > 360) break; // 单条很长时兜底截断
+    }
+    if (added) out += para + '。';
+  }
+  return out;
+}
+
+function summaryModal() {
+  const text = genSummary(logMonth);
+  if (!text) { toast(monthLabel(logMonth) + '还没有工作记录，无法生成总结', 'err'); return; }
+  formModal(`${monthLabel(logMonth)}工作总结（约 ${text.length} 字）`, [
+    { key: 'summary', label: '内容可直接修改，点「复制」后粘贴到需要的地方', type: 'textarea', rows: 12 },
+  ], { summary: text }, '复制').then(v => {
+    if (!v) return;
+    const done = () => toast('已复制到剪贴板 ✓');
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(v.summary).then(done).catch(() => toast('复制失败，请手动全选复制', 'err'));
+    else toast('请手动全选复制', 'err');
+  });
+}
+
 function renderLogs(box) {
-  const logs = [...store.data.work.logs].sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
   const today = todayStr();
-  const todayLog = logs.find(l => l.date === today);
+  const todayLog = store.data.work.logs.find(l => l.date === today);
+
+  // 往日记录列表：按月份浏览 / 关键词全局搜索（独立重绘，搜索时不丢输入焦点）
+  const listBox = el('div', {});
+  const logCard = l => el('div', { class: 'card work-row' },
+    el('div', { class: 'work-main' },
+      el('div', { class: 'work-title', style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap' },
+        dateLabel(l.date),
+        l.date === today ? el('span', { class: 'tag' }, '今天') : null),
+      ...logBody(l)),
+    el('div', { class: 'work-ops' },
+      el('button', { class: 'btn btn-sm', onclick: () => logModal(l) }, icon('edit', 14)),
+      el('button', { class: 'btn btn-sm btn-danger', onclick: async () => { if (await confirmBox(`删除 ${l.date} 的记录？`)) { store.update(d => { d.work.logs = d.work.logs.filter(i => i.id !== l.id); }); paintList(); } } }, icon('trash', 14))));
+
+  function paintList() {
+    const all = [...store.data.work.logs].sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
+    const q = logQuery.toLowerCase();
+    const match = l => [l.date, l.focus, ...CATS.map(([k]) => l[k]), l.content].some(s => (s || '').toLowerCase().includes(q));
+    const shown = q ? all.filter(match) : all.filter(l => l.date.startsWith(logMonth));
+    listBox.innerHTML = '';
+    if (!shown.length) {
+      listBox.append(emptyState('note',
+        q ? `没有找到包含「${logQuery}」的记录` : `${monthLabel(logMonth)}没有工作记录`,
+        q ? '换个关键词试试' : '可以点「补记以往日期」补录，或切换月份查看'));
+      return;
+    }
+    const cap = shown.slice(0, 200);
+    listBox.append(
+      el('div', { class: 'tiny muted', style: 'margin:2px 2px 8px' },
+        q ? `找到 ${shown.length} 条记录` + (shown.length > 200 ? '，显示前 200 条' : '') : `${monthLabel(logMonth)}共 ${shown.length} 条记录`),
+      el('div', { class: 'work-list' }, cap.map(logCard)));
+  }
+
+  const searchIn = el('input', { class: 'input', type: 'search', placeholder: '查找往日记录：输入关键词或日期，搜索全部记录…' });
+  searchIn.value = logQuery;
+  searchIn.oninput = () => { logQuery = searchIn.value.trim(); paintList(); };
 
   // 今日快记：当日重点工作 + 四分类
   const focusIn = el('input', { class: 'input', type: 'text', placeholder: '当日重点工作（选填）' }, '');
@@ -305,18 +392,19 @@ function renderLogs(box) {
         el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: exportLogs }, icon('down', 14), '导出 Excel'),
         el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: () => importLogs(box) }, icon('up', 14), '导入 Excel'))),
 
-    logs.length
-      ? el('div', { class: 'work-list' }, logs.map(l =>
-        el('div', { class: 'card work-row' },
-          el('div', { class: 'work-main' },
-            el('div', { class: 'work-title', style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap' },
-              dateLabel(l.date),
-              l.date === today ? el('span', { class: 'tag' }, '今天') : null),
-            ...logBody(l)),
-          el('div', { class: 'work-ops' },
-            el('button', { class: 'btn btn-sm', onclick: () => logModal(l) }, icon('edit', 14)),
-            el('button', { class: 'btn btn-sm btn-danger', onclick: async () => { if (await confirmBox(`删除 ${l.date} 的记录？`)) store.update(d => { d.work.logs = d.work.logs.filter(i => i.id !== l.id); }); } }, icon('trash', 14))))))
-      : emptyState('note', '还没有工作记录', '在上方写下今天的完成情况'));
+    // 往日记录：月份切换 + 月度总结 + 搜索
+    el('div', { class: 'card' },
+      el('div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap' },
+        el('div', { class: 'work-month' },
+          el('button', { class: 'btn btn-sm', onclick: () => { logMonth = shiftMonth(logMonth, -1); paintList(); } }, '‹'),
+          el('span', { class: 'work-month-label' }, monthLabel(logMonth)),
+          el('button', { class: 'btn btn-sm', onclick: () => { logMonth = shiftMonth(logMonth, 1); paintList(); } }, '›'),
+          logMonth !== monthStr() ? el('button', { class: 'btn btn-sm', onclick: () => { logMonth = monthStr(); paintList(); } }, '回本月') : null),
+        el('div', { style: 'margin-left:auto' },
+          el('button', { class: 'btn btn-sm btn-primary', onclick: summaryModal }, '月度总结'))),
+      el('div', { style: 'margin-top:10px' }, searchIn)),
+    listBox);
+  paintList();
 }
 
 // ---------------- 视图入口 ----------------
