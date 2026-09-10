@@ -2,7 +2,7 @@
 // 策略：页面导航 network-first（拿到新版本优先）；静态资源 stale-while-revalidate；
 // 外部接口（行情/天气/GitHub/热榜）不缓存，直接走网络，由应用层自己做降级。
 
-const CACHE = 'workbench-v6';
+const CACHE = 'workbench-v7';
 
 const SHELL = [
   './',
@@ -35,7 +35,10 @@ const SHELL = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      // 预缓存强制走网络（reload 跳过 HTTP 缓存），避免把 CDN 上的旧文件存进新版本缓存
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
   );
 });
 
