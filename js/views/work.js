@@ -1,9 +1,17 @@
 // ============ 工作情况：月工作计划 + 日工作完成情况 ============
 import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, todayStr, fmtDateTime, toast, uid, WEEK_CN } from '../util.js';
 import { store } from '../store.js';
-import { exportExcel, pickExcelRows, asText, asMonth, asDate, asDone } from '../excel.js';
+import { exportExcelBook, pickExcelBook, asText, asMonth, asDate, asDone } from '../excel.js';
 
 const XLSX_BTN = 'display:inline-flex;align-items:center;gap:5px';
+
+// 工作完成情况的四个分类（参照工作日志格式）
+const CATS = [
+  ['install', '对安装公司'],
+  ['civil', '对土建、业主、监理'],
+  ['sub', '对分包商'],
+  ['other', '其他'],
+];
 
 const pad = n => String(n).padStart(2, '0');
 function monthStr(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
@@ -26,44 +34,67 @@ function dateLabel(ds) {
 async function exportPlans() {
   try {
     const plans = [...store.data.work.plans].sort((a, b) => a.month.localeCompare(b.month) || a.createdAt - b.createdAt);
-    if (!plans.length) { toast('还没有计划可导出', 'err'); return; }
+    const focus = store.data.work.focus || {};
+    if (!plans.length && !Object.keys(focus).length) { toast('还没有计划可导出', 'err'); return; }
     const aoa = [['月份', '计划内容', '备注', '是否完成', '创建时间']];
     plans.forEach(p => aoa.push([p.month, p.title, p.note || '', p.done ? '已完成' : '未完成', fmtDateTime(p.createdAt)]));
-    await exportExcel(`月工作计划-${todayStr()}.xlsx`, '月工作计划', aoa, [10, 42, 42, 10, 18]);
+    const focusAoa = [['月份', '当月重点工作']];
+    Object.keys(focus).sort().forEach(m => { if (focus[m]) focusAoa.push([m, focus[m]]); });
+    await exportExcelBook(`月工作计划-${todayStr()}.xlsx`, [
+      { name: '月工作计划', aoa, widths: [10, 42, 42, 10, 18] },
+      { name: '当月重点工作', aoa: focusAoa, widths: [10, 60] },
+    ]);
     toast(`已导出 ${plans.length} 条计划`);
   } catch (e) { toast(e.message || '导出失败', 'err'); }
 }
 
 async function importPlans(box) {
   try {
-    const rows = await pickExcelRows();
-    if (!rows) return;
-    const data = rows.filter(r => r.some(c => asText(c) !== ''));
-    if (data.length < 2) { toast('表格里没有可导入的数据', 'err'); return; }
-    const head = data[0].map(asText);
-    const colOf = (...names) => head.findIndex(h => names.some(n => h.includes(n)));
-    const cMonth = colOf('月份', '月度'), cTitle = colOf('计划', '内容', '目标'), cNote = colOf('备注', '说明'), cDone = colOf('完成');
-    if (cTitle < 0) { toast('没认出「计划内容」列，请确认第一行是表头', 'err'); return; }
-    let added = 0, updated = 0, skipped = 0;
+    const sheets = await pickExcelBook();
+    if (!sheets) return;
+    const planSheet = sheets.find(s => s.name.includes('计划')) || sheets[0];
+    const focusSheet = sheets.find(s => s.name.includes('重点'));
+    const data = planSheet.rows.filter(r => r.some(c => asText(c) !== ''));
+    if (data.length < 2 && !focusSheet) { toast('表格里没有可导入的数据', 'err'); return; }
+    let added = 0, updated = 0, skipped = 0, focusCnt = 0;
     store.update(d => {
-      data.slice(1).forEach(r => {
-        const title = asText(r[cTitle]);
-        if (!title) { skipped++; return; }
-        const m = (cMonth >= 0 ? asMonth(r[cMonth]) : null) || curMonth;
-        const note = cNote >= 0 ? asText(r[cNote]) : '';
-        const doneCell = cDone >= 0 ? asText(r[cDone]) : '';
-        const hit = d.work.plans.find(p => p.month === m && p.title === title);
-        if (hit) {
-          if (note) hit.note = note;
-          if (doneCell) hit.done = asDone(r[cDone]);
-          updated++;
-        } else {
-          d.work.plans.push({ id: uid(), month: m, title, note, done: doneCell ? asDone(doneCell) : false, createdAt: Date.now() });
-          added++;
+      if (data.length >= 2) {
+        const head = data[0].map(asText);
+        const colOf = (...names) => head.findIndex(h => names.some(n => h.includes(n)));
+        const cMonth = colOf('月份', '月度'), cTitle = colOf('计划', '内容', '目标'), cNote = colOf('备注', '说明'), cDone = colOf('完成');
+        if (cTitle < 0) { toast('没认出「计划内容」列，请确认第一行是表头', 'err'); return; }
+        data.slice(1).forEach(r => {
+          const title = asText(r[cTitle]);
+          if (!title) { skipped++; return; }
+          const m = (cMonth >= 0 ? asMonth(r[cMonth]) : null) || curMonth;
+          const note = cNote >= 0 ? asText(r[cNote]) : '';
+          const doneCell = cDone >= 0 ? asText(r[cDone]) : '';
+          const hit = d.work.plans.find(p => p.month === m && p.title === title);
+          if (hit) {
+            if (note) hit.note = note;
+            if (doneCell) hit.done = asDone(r[cDone]);
+            updated++;
+          } else {
+            d.work.plans.push({ id: uid(), month: m, title, note, done: doneCell ? asDone(doneCell) : false, createdAt: Date.now() });
+            added++;
+          }
+        });
+      }
+      if (focusSheet && focusSheet.rows.length >= 2) {
+        const head = focusSheet.rows[0].map(asText);
+        const cM = head.findIndex(h => h.includes('月份'));
+        const cF = head.findIndex(h => h.includes('重点'));
+        if (cF >= 0) {
+          d.work.focus = d.work.focus || {};
+          focusSheet.rows.slice(1).forEach(r => {
+            const text = asText(r[cF]);
+            const m = (cM >= 0 ? asMonth(r[cM]) : null) || curMonth;
+            if (text) { d.work.focus[m] = text; focusCnt++; }
+          });
         }
-      });
+      }
     });
-    toast(`导入完成：新增 ${added} 条` + (updated ? `，更新 ${updated} 条` : '') + (skipped ? `，跳过 ${skipped} 行` : ''));
+    toast(`导入完成：新增 ${added} 条` + (updated ? `，更新 ${updated} 条` : '') + (focusCnt ? `，重点工作 ${focusCnt} 条` : '') + (skipped ? `，跳过 ${skipped} 行` : ''));
     if (tab === 'plans') renderPlans(box);
   } catch (e) { toast(e.message || '导入失败', 'err'); }
 }
@@ -72,32 +103,43 @@ async function exportLogs() {
   try {
     const logs = [...store.data.work.logs].sort((a, b) => a.date.localeCompare(b.date));
     if (!logs.length) { toast('还没有记录可导出', 'err'); return; }
-    const aoa = [['日期', '完成情况', '更新时间']];
-    logs.forEach(l => aoa.push([l.date, l.content, fmtDateTime(l.updatedAt)]));
-    await exportExcel(`日工作完成情况-${todayStr()}.xlsx`, '日工作完成情况', aoa, [14, 60, 18]);
+    const aoa = [['日期', '当日重点工作', '对安装公司', '对土建、业主、监理', '对分包商', '其他', '更新时间']];
+    logs.forEach(l => aoa.push([l.date, l.focus || '', l.install || '', l.civil || '', l.sub || '', l.other || l.content || '', fmtDateTime(l.updatedAt)]));
+    await exportExcelBook(`日工作完成情况-${todayStr()}.xlsx`, [
+      { name: '日工作完成情况', aoa, widths: [12, 24, 30, 30, 30, 30, 18] },
+    ]);
     toast(`已导出 ${logs.length} 条记录`);
   } catch (e) { toast(e.message || '导出失败', 'err'); }
 }
 
 async function importLogs(box) {
   try {
-    const rows = await pickExcelRows();
-    if (!rows) return;
+    const sheets = await pickExcelBook();
+    if (!sheets) return;
+    const rows = sheets.find(s => s.name.includes('完成'))?.rows || sheets[0].rows;
     const data = rows.filter(r => r.some(c => asText(c) !== ''));
     if (data.length < 2) { toast('表格里没有可导入的数据', 'err'); return; }
     const head = data[0].map(asText);
     const colOf = (...names) => head.findIndex(h => names.some(n => h.includes(n)));
-    const cDate = colOf('日期'), cContent = colOf('完成情况', '内容', '记录');
-    if (cDate < 0 || cContent < 0) { toast('没认出「日期」或「完成情况」列，请确认第一行是表头', 'err'); return; }
+    const cDate = colOf('日期'), cFocus = colOf('重点');
+    const cInstall = colOf('安装'), cCivil = colOf('土建', '业主'), cSub = colOf('分包');
+    const cOther = colOf('其他'), cLegacy = colOf('完成情况', '内容', '记录');
+    if (cDate < 0 || [cInstall, cCivil, cSub, cOther, cLegacy].every(c => c < 0)) {
+      toast('没认出「日期」或分类内容列，请确认第一行是表头', 'err'); return;
+    }
     let added = 0, updated = 0, skipped = 0;
     store.update(d => {
       data.slice(1).forEach(r => {
         const date = asDate(r[cDate]);
-        const content = asText(r[cContent]);
-        if (!date || !content) { skipped++; return; }
+        const get = i => (i >= 0 ? asText(r[i]) : '');
+        const fields = {
+          focus: get(cFocus), install: get(cInstall), civil: get(cCivil),
+          sub: get(cSub), other: get(cOther) || get(cLegacy),
+        };
+        if (!date || !Object.values(fields).some(Boolean)) { skipped++; return; }
         const hit = d.work.logs.find(l => l.date === date);
-        if (hit) { hit.content = content; hit.updatedAt = Date.now(); updated++; }
-        else { d.work.logs.push({ id: uid(), date, content, createdAt: Date.now(), updatedAt: Date.now() }); added++; }
+        if (hit) { Object.assign(hit, fields, { content: '', updatedAt: Date.now() }); updated++; }
+        else { d.work.logs.push({ id: uid(), date, content: '', ...fields, createdAt: Date.now(), updatedAt: Date.now() }); added++; }
       });
     });
     toast(`导入完成：新增 ${added} 条` + (updated ? `，覆盖 ${updated} 条` : '') + (skipped ? `，跳过 ${skipped} 行` : ''));
@@ -125,6 +167,9 @@ function renderPlans(box) {
   const doneCnt = plans.filter(p => p.done).length;
   const pct = plans.length ? Math.round(doneCnt / plans.length * 100) : 0;
 
+  // 当月重点工作输入框
+  const focusTa = el('textarea', { class: 'input', rows: '2', placeholder: '这个月最重要的工作是什么？' }, (store.data.work.focus || {})[curMonth] || '');
+
   box.innerHTML = '';
   box.append(...[
     // 月份切换 + 新建
@@ -138,6 +183,21 @@ function renderPlans(box) {
         el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: exportPlans }, icon('down', 14), '导出 Excel'),
         el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: () => importPlans(box) }, icon('up', 14), '导入 Excel'),
         el('button', { class: 'btn btn-primary', onclick: () => planModal() }, '+ 新建计划'))),
+
+    // 当月重点工作
+    el('div', { class: 'card work-today' },
+      cardTitle('bulb', '当月重点工作'),
+      focusTa,
+      el('div', { style: 'margin-top:10px' },
+        el('button', {
+          class: 'btn btn-primary btn-sm', onclick: () => {
+            store.update(d => {
+              d.work.focus = d.work.focus || {};
+              d.work.focus[curMonth] = focusTa.value.trim();
+            });
+            toast(monthLabel(curMonth) + '重点工作已保存');
+          }
+        }, '保存重点工作'))),
 
     // 完成进度
     plans.length ? el('div', { class: 'card work-progress' },
@@ -165,22 +225,46 @@ function renderPlans(box) {
 }
 
 // ---------------- 日工作完成情况 ----------------
+function saveLog(date, fields) {
+  store.update(d => {
+    const hit = d.work.logs.find(l => l.date === date);
+    if (hit) Object.assign(hit, fields, { content: '', updatedAt: Date.now() });
+    else d.work.logs.push({ id: uid(), date, content: '', ...fields, createdAt: Date.now(), updatedAt: Date.now() });
+  });
+}
+
 function logModal(existing) {
   formModal(existing ? '编辑工作记录' : '补记工作完成情况', [
     { key: 'date', label: '日期', type: 'date', required: true },
-    { key: 'content', label: '完成情况', type: 'textarea', rows: 5, required: true, placeholder: '今天完成了哪些工作？' },
-  ], existing || { date: todayStr() }).then(v => {
+    { key: 'focus', label: '当日重点工作', placeholder: '可选：今天最重要的事' },
+    ...CATS.map(([k, label]) => ({ key: k, label, type: 'textarea', rows: 2, placeholder: '可选' })),
+  ], existing
+    ? { ...existing, other: existing.other || existing.content || '' }
+    : { date: todayStr() }).then(v => {
     if (!v) return;
-    store.update(d => {
-      if (existing) Object.assign(d.work.logs.find(l => l.id === existing.id), v, { updatedAt: Date.now() });
-      else {
-        const dup = d.work.logs.find(l => l.date === v.date);
-        if (dup) { dup.content = v.content; dup.updatedAt = Date.now(); }
-        else d.work.logs.push({ id: uid(), date: v.date, content: v.content, createdAt: Date.now(), updatedAt: Date.now() });
-      }
-    });
+    const fields = { focus: v.focus || '', install: v.install || '', civil: v.civil || '', sub: v.sub || '', other: v.other || '' };
+    if (!Object.values(fields).some(Boolean)) { toast('至少填写一项内容', 'err'); return; }
+    saveLog(v.date, fields);
     toast('已保存');
   });
+}
+
+// 一条记录的展示内容（重点工作 + 四分类，兼容旧格式的 content）
+function logBody(l) {
+  const parts = [];
+  if (l.focus) {
+    parts.push(el('div', { style: 'margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(34,211,238,.08);border-radius:6px;font-size:13.5px' }, '★ 当日重点：' + l.focus));
+  }
+  const filled = CATS.filter(([k]) => l[k]);
+  if (filled.length) {
+    filled.forEach(([k, label]) => parts.push(
+      el('div', { style: 'margin-top:8px' },
+        el('span', { class: 'tag' }, label),
+        el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:4px;white-space:pre-wrap' }, l[k]))));
+  } else if (l.content) {
+    parts.push(el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:6px;white-space:pre-wrap' }, l.content));
+  }
+  return parts;
 }
 
 function renderLogs(box) {
@@ -188,23 +272,33 @@ function renderLogs(box) {
   const today = todayStr();
   const todayLog = logs.find(l => l.date === today);
 
-  const ta = el('textarea', { class: 'input', rows: '3', placeholder: '今天完成了哪些工作？随手记一笔…' }, todayLog ? todayLog.content : '');
+  // 今日快记：当日重点工作 + 四分类
+  const focusIn = el('input', { class: 'input', type: 'text', placeholder: '当日重点工作（选填）' }, '');
+  focusIn.value = todayLog ? (todayLog.focus || '') : '';
+  const catInputs = CATS.map(([k, label]) => {
+    const ta = el('textarea', { class: 'input', rows: '2', placeholder: label + '…' }, '');
+    ta.value = todayLog ? (todayLog[k] || (k === 'other' ? (todayLog.content || '') : '')) : '';
+    return { k, label, ta };
+  });
+
   box.innerHTML = '';
   box.append(
     el('div', { class: 'card work-today' },
       cardTitle('edit', '今天 · ' + dateLabel(today)),
-      ta,
-      el('div', { style: 'display:flex;gap:10px;margin-top:10px;flex-wrap:wrap' },
+      focusIn,
+      ...catInputs.map(({ label, ta }) =>
+        el('div', { style: 'margin-top:10px' },
+          el('div', { class: 'tiny muted', style: 'margin-bottom:4px' }, label),
+          ta)),
+      el('div', { style: 'display:flex;gap:10px;margin-top:12px;flex-wrap:wrap' },
         el('button', {
           class: 'btn btn-primary', onclick: () => {
-            const content = ta.value.trim();
-            if (!content) { toast('先写点内容再保存', 'err'); ta.focus(); return; }
-            store.update(d => {
-              const dup = d.work.logs.find(l => l.date === today);
-              if (dup) { dup.content = content; dup.updatedAt = Date.now(); }
-              else d.work.logs.push({ id: uid(), date: today, content, createdAt: Date.now(), updatedAt: Date.now() });
-            });
+            const fields = { focus: focusIn.value.trim() };
+            catInputs.forEach(({ k, ta }) => { fields[k] = ta.value.trim(); });
+            if (!Object.values(fields).some(Boolean)) { toast('先写点内容再保存', 'err'); focusIn.focus(); return; }
+            saveLog(today, fields);
             toast('今天的工作已记录 ✓');
+            renderLogs(box);
           }
         }, todayLog ? '更新今天的记录' : '保存今天的记录'),
         el('button', { class: 'btn', onclick: () => logModal() }, '补记以往日期'),
@@ -218,7 +312,7 @@ function renderLogs(box) {
             el('div', { class: 'work-title', style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap' },
               dateLabel(l.date),
               l.date === today ? el('span', { class: 'tag' }, '今天') : null),
-            el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:6px;white-space:pre-wrap' }, l.content)),
+            ...logBody(l)),
           el('div', { class: 'work-ops' },
             el('button', { class: 'btn btn-sm', onclick: () => logModal(l) }, icon('edit', 14)),
             el('button', { class: 'btn btn-sm btn-danger', onclick: async () => { if (await confirmBox(`删除 ${l.date} 的记录？`)) store.update(d => { d.work.logs = d.work.logs.filter(i => i.id !== l.id); }); } }, icon('trash', 14))))))

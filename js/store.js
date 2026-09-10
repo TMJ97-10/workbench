@@ -27,7 +27,8 @@ function blankData() {
     },
     work: {
       plans: [],          // {id,month:'YYYY-MM',title,note,done,createdAt}
-      logs: [],           // {id,date:'YYYY-MM-DD',content,createdAt,updatedAt}
+      logs: [],           // {id,date:'YYYY-MM-DD',focus,install,civil,sub,other,content(旧格式),createdAt,updatedAt}
+      focus: {},          // { 'YYYY-MM': '当月重点工作' }
     },
     settings: {},
   };

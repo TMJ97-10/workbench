@@ -19,16 +19,28 @@ export function loadXLSX() {
 
 // 导出：aoa = 二维数组（第一行是表头）
 export async function exportExcel(filename, sheetName, aoa, colWidths) {
+  return exportExcelBook(filename, [{ name: sheetName, aoa, widths: colWidths }]);
+}
+
+// 多工作表导出：sheets = [{ name, aoa, widths }]
+export async function exportExcelBook(filename, sheets) {
   const XLSX = await loadXLSX();
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  if (colWidths) ws['!cols'] = colWidths.map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  sheets.forEach(({ name, aoa, widths }) => {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    if (widths) ws['!cols'] = widths.map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  });
   XLSX.writeFile(wb, filename);
 }
 
 // 导入：弹出文件选择框，解析第一个工作表为二维数组；用户取消时返回 null
 export function pickExcelRows() {
+  return pickExcelBook().then(book => (book ? book[0].rows : null));
+}
+
+// 导入：返回全部工作表 [{ name, rows }]；用户取消时返回 null
+export function pickExcelBook() {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -40,8 +52,10 @@ export function pickExcelRows() {
         const XLSX = await loadXLSX();
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        resolve(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }));
+        resolve(wb.SheetNames.map(name => ({
+          name,
+          rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' }),
+        })));
       } catch (e) {
         reject(new Error('文件读取失败，请确认是 Excel 文件（.xlsx）'));
       }
