@@ -82,14 +82,47 @@ export const store = {
     this.schedulePush();
   },
 
-  /** 用远端数据覆盖本地（last-write-wins） */
+  /** 用远端数据合并到本地：按模块取并集，同键以远端为准；任何一方已有的内容都不会丢 */
   replaceFromRemote(remote) {
-    const base = loadLocal(); // 借用深合并逻辑
-    const merged = { ...base, ...remote };
-    merged.meta = { ...base.meta, ...(remote.meta || {}) };
-    merged.learning = { ...base.learning, ...(remote.learning || {}) };
-    merged.stocks = { ...base.stocks, ...(remote.stocks || {}) };
-    merged.work = { ...base.work, ...(remote.work || {}) };
+    const local = loadLocal(); // 借用深合并逻辑，保证字段齐全
+    const byId = (l = [], r = []) => {
+      const map = new Map();
+      l.forEach(x => x && x.id != null && map.set(x.id, x));
+      r.forEach(x => x && x.id != null && map.set(x.id, x)); // 远端覆盖同 id
+      return [...map.values()];
+    };
+    const byKey = (key) => (l = [], r = []) => {
+      const map = new Map();
+      l.forEach(x => x && x[key] != null && map.set(x[key], x));
+      r.forEach(x => x && x[key] != null && map.set(x[key], x));
+      return [...map.values()];
+    };
+    const rl = remote.learning || {}, rs = remote.stocks || {}, rw = remote.work || {};
+    const merged = {
+      ...local, ...remote,
+      meta: { ...local.meta, ...(remote.meta || {}), updatedAt: Math.max(local.meta?.updatedAt || 0, remote.meta?.updatedAt || 0) },
+      todos: byId(local.todos, remote.todos),
+      events: byId(local.events, remote.events),
+      notes: byId(local.notes, remote.notes),
+      inspirations: byId(local.inspirations, remote.inspirations),
+      prompts: byId(local.prompts, remote.prompts),
+      ledger: byId(local.ledger, remote.ledger),
+      learning: {
+        plans: byId(local.learning.plans, rl.plans),
+        checkins: [...new Set([...(local.learning.checkins || []), ...(rl.checkins || [])])].sort(),
+      },
+      stocks: {
+        trades: byId(local.stocks.trades, rs.trades),
+        watchlist: byKey('code')(local.stocks.watchlist, rs.watchlist),
+        notes: byId(local.stocks.notes, rs.notes),
+      },
+      work: {
+        plans: byId(local.work.plans, rw.plans),
+        logs: byKey('date')(local.work.logs, rw.logs), // 日志按日期合并，同日期以远端为准
+        focus: { ...(local.work.focus || {}), ...(rw.focus || {}) },
+      },
+      settings: { ...(local.settings || {}), ...(remote.settings || {}) },
+    };
     this.data = merged;
     this.saveLocal();
     this.emitChange('remote');
@@ -117,9 +150,12 @@ export const store = {
     this.setSync({ state: 'syncing', msg: '正在检查云端…' });
     try {
       const remote = await pullRemote(token, this.getRepo());
-      if (remote && remote.data && (remote.data.meta?.updatedAt || 0) > (this.data.meta.updatedAt || 0)) {
+      if (remote && remote.data) {
+        // 双向合并（并集）：本地较新时把合并结果推回云端，保证两端都是完整数据
+        const localNewer = (this.data.meta.updatedAt || 0) > (remote.data.meta?.updatedAt || 0);
         this.replaceFromRemote(remote.data);
-        this.setSync({ state: 'ok', time: Date.now(), msg: '已从云端恢复 ' + fmtHM(Date.now()) });
+        if (localNewer) await this.pushNow();
+        this.setSync({ state: 'ok', time: Date.now(), msg: '已同步 ' + fmtHM(Date.now()) });
       } else {
         this.setSync({ state: 'ok', time: Date.now(), msg: '已同步 ' + fmtHM(Date.now()) });
       }

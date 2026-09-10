@@ -2,7 +2,7 @@
 // 策略：页面导航 network-first（拿到新版本优先）；静态资源 stale-while-revalidate；
 // 外部接口（行情/天气/GitHub/热榜）不缓存，直接走网络，由应用层自己做降级。
 
-const CACHE = 'workbench-v8';
+const CACHE = 'workbench-v9';
 
 const SHELL = [
   './',
