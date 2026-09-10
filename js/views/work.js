@@ -259,10 +259,10 @@ function logBody(l) {
   }
   const filled = CATS.filter(([k]) => l[k]);
   if (filled.length) {
-    filled.forEach(([k, label]) => parts.push(
-      el('div', { style: 'margin-top:8px' },
-        el('span', { class: 'tag' }, label),
-        el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:4px;white-space:pre-wrap' }, l[k]))));
+    parts.push(el('div', { class: 'work-cols' }, filled.map(([k, label]) =>
+      el('div', { class: 'work-col' },
+        el('div', { class: 'work-col-h' }, label),
+        el('div', { class: 'work-col-b' }, l[k])))));
   } else if (l.content) {
     parts.push(el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:6px;white-space:pre-wrap' }, l.content));
   }
@@ -375,10 +375,10 @@ function renderLogs(box) {
     el('div', { class: 'card work-today' },
       cardTitle('edit', '今天 · ' + dateLabel(today)),
       focusIn,
-      ...catInputs.map(({ label, ta }) =>
-        el('div', { style: 'margin-top:10px' },
+      el('div', { class: 'work-cols', style: 'margin-top:10px' }, catInputs.map(({ label, ta }) =>
+        el('div', {},
           el('div', { class: 'tiny muted', style: 'margin-bottom:4px' }, label),
-          ta)),
+          ta))),
       el('div', { style: 'display:flex;gap:10px;margin-top:12px;flex-wrap:wrap' },
         el('button', {
           class: 'btn btn-primary', onclick: () => {

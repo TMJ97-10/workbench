@@ -435,3 +435,9 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .work-check:hover{border-color:var(--accent)}
 .work-check.on{background:var(--accent);border-color:var(--accent);color:#04202a}
 .work-today{padding:14px 16px;margin-bottom:14px}
+
+/* 日工作完成情况：四分类按列显示（自动列数，窄屏自动换行） */
+.work-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:8px}
+.work-col{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 10px;min-width:0;background:rgba(255,255,255,.02)}
+.work-col-h{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:5px}
+.work-col-b{font-size:13px;color:var(--text-2);white-space:pre-wrap;word-break:break-word}
