@@ -109,7 +109,7 @@ export function toast(msg, type = '') {
 let activeCleanup = null;
 export function closeModal() { if (activeCleanup) { const c = activeCleanup; activeCleanup = null; c(null); } }
 
-function openModal({ title, body, actions = [] }) {
+function openModal({ title, body, actions = [], beforeClose = null }) {
   closeModal();
   const root = $('#modal-root');
   return new Promise(resolve => {
@@ -117,7 +117,12 @@ function openModal({ title, body, actions = [] }) {
       mask.remove(); document.removeEventListener('keydown', onKey);
       activeCleanup = null; resolve(val);
     };
-    const onKey = e => { if (e.key === 'Escape') cleanup(null); };
+    // 遮罩 / Esc 关闭前可拦截（beforeClose 返回 false 则保持打开，防误触丢数据）
+    const tryClose = async () => {
+      if (beforeClose) { const r = await beforeClose(); if (r === false) return; }
+      cleanup(null);
+    };
+    const onKey = e => { if (e.key === 'Escape') tryClose(); };
     document.addEventListener('keydown', onKey);
     activeCleanup = cleanup;
     const btns = actions.map(a => el('button', {
@@ -127,7 +132,7 @@ function openModal({ title, body, actions = [] }) {
         else cleanup(a.value !== undefined ? a.value : true);
       }
     }, a.label));
-    const mask = el('div', { class: 'modal-mask', onclick: e => { if (e.target === mask) cleanup(null); } },
+    const mask = el('div', { class: 'modal-mask', onclick: e => { if (e.target === mask) tryClose(); } },
       el('div', { class: 'modal' },
         el('h3', {}, title),
         body,
@@ -169,9 +174,20 @@ export function formModal(title, fields, initial = {}, okLabel = '保存') {
     body.append(el('div', { class: 'field' },
       el('label', {}, f.label, f.required ? el('span', { class: 'req' }, ' *') : null), inp));
   }
+  // 防误触：遮罩/Esc 关闭时若有未保存修改，需再次确认
+  const initialStr = fields.map(f => String(inputs[f.key] ? inputs[f.key].value : '')).join('');
+  let giveUpArmed = false;
   return new Promise(resolve => {
     openModal({
       title, body,
+      beforeClose: () => {
+        const now = fields.map(f => String(inputs[f.key].value ?? '')).join('');
+        if (now === initialStr) return true;
+        if (giveUpArmed) return true;
+        giveUpArmed = true;
+        toast('检测到未保存的修改：再点一次遮罩或按 Esc 确认放弃', 'err');
+        return false;
+      },
       actions: [
         { label: '取消', value: null },
         {
@@ -309,7 +325,7 @@ function currentBlock(ed) {
  *   - rt.value 读/写 HTML；rt.focus() 聚焦编辑器；rt 可直接 append 到表单。
  *   - 字色：选中文字 → 点色块；段色：光标放段落里点色块 = 整段铺底色，选中文字则只标选中部分。
  */
-export function richText({ placeholder = '', value = '', rows = 3, single = false, onEnter = null } = {}) {
+export function richText({ placeholder = '', value = '', rows = 3, single = false, onEnter = null, onInput = null } = {}) {
   const ed = el('div', { class: 'rich-ed input', dataset: { ph: placeholder } });
   ed.contentEditable = 'true';
   ed.setAttribute('role', 'textbox');
@@ -368,6 +384,7 @@ export function richText({ placeholder = '', value = '', rows = 3, single = fals
   ed.addEventListener('keydown', (e) => {
     if (single && e.key === 'Enter') { e.preventDefault(); if (onEnter) onEnter(); }
   });
+  if (onInput) ed.addEventListener('input', onInput);
   // 粘贴一律按纯文本插入，避免带入外部样式
   ed.addEventListener('paste', (e) => {
     e.preventDefault();
