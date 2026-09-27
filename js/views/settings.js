@@ -1,5 +1,5 @@
-// ============ 设置（GitHub Token / 仓库 / 手动同步 / 备份） ============
-import { el, icon, viewHead, cardTitle, fmtDateTime, toast, confirmBox } from '../util.js';
+// ============ 设置（外观主题 / GitHub Token / 仓库 / 手动同步 / 备份） ============
+import { el, icon, viewHead, cardTitle, fmtDateTime, toast, confirmBox, setTheme } from '../util.js';
 import { store } from '../store.js';
 
 const STATE_TEXT = {
@@ -8,6 +8,16 @@ const STATE_TEXT = {
   ok: ['已同步', ''],
   err: ['同步失败', ''],
 };
+
+// ---- 外观主题（与 css/style.css 中 [data-theme] 一一对应） ----
+const THEMES = [
+  { id: 'green', name: '翡翠绿', c1: '#34D399', c2: '#22D3EE' },
+  { id: 'cyan', name: '曜石青', c1: '#22D3EE', c2: '#34D399' },
+  { id: 'blue', name: '冰川蓝', c1: '#60A5FA', c2: '#22D3EE' },
+  { id: 'violet', name: '极光紫', c1: '#A78BFA', c2: '#F472B6' },
+  { id: 'orange', name: '落日橙', c1: '#FB923C', c2: '#FBBF24' },
+  { id: 'light', name: '浅色·白天', c1: '#EDF1F7', c2: '#0891B2' },
+];
 
 function statusLine() {
   const s = store.sync;
@@ -29,7 +39,26 @@ export function render(root) {
   const unsub = store.onSync(() => { statusBox.innerHTML = ''; statusBox.append(statusLine()); });
 
   root.append(
-    viewHead('设置', '云端同步与数据管理'),
+    viewHead('设置', '外观主题 · 云端同步与数据管理'),
+
+    // ---- 外观设置 ----
+    el('div', { class: 'card set-card' },
+      cardTitle('gear', '外观设置', el('span', { class: 'right tiny muted' }, '主题保存在本机，各设备可不同')),
+      el('div', { class: 'theme-grid' }, THEMES.map(t => {
+        const cur = (document.documentElement.dataset.theme || 'green') === t.id;
+        return el('button', {
+          class: 'theme-opt' + (cur ? ' on' : ''), type: 'button',
+          onclick: (e) => {
+            setTheme(t.id);
+            root.querySelectorAll('.theme-opt').forEach(b => b.classList.toggle('on', b === e.currentTarget));
+            toast(`已切换为「${t.name}」`, 'ok');
+          }
+        },
+          el('span', { class: 'theme-dots' },
+            el('i', { style: `background:${t.c1}` }),
+            el('i', { style: `background:${t.c2}` })),
+          el('span', { class: 'theme-name' }, t.name));
+      }))),
 
     // ---- 同步状态 ----
     el('div', { class: 'card set-card' },
