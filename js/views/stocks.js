@@ -1,6 +1,6 @@
 // ============ 股票记录（交易 / 持仓 / 自选 / 投资笔记） ============
 // 配色按 A 股习惯：红涨绿跌。盈亏为正显示红，为负显示绿。
-import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, todayStr, fmtMoney, fmtPct, fmtDateTime, toast } from '../util.js';
+import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, todayStr, fmtMoney, fmtPct, fmtDateTime, toast, richToHtml } from '../util.js';
 import { store } from '../store.js';
 import { fetchQuotes, normCode } from '../quotes.js';
 
@@ -225,7 +225,7 @@ function renderStockNotes(box) {
             class: 'icon-btn danger', title: '删除',
             onclick: async () => { if (await confirmBox(`删除笔记「${n.title}」？`)) store.update(dd => { dd.stocks.notes = dd.stocks.notes.filter(x => x.id !== n.id); }); }
           }, icon('trash', 14))),
-        n.body ? el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:8px;white-space:pre-wrap' }, n.body) : null)))
+        n.body ? el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:8px;white-space:pre-wrap', html: richToHtml(n.body) }) : null)))
       : emptyState('note', '还没有投资笔记', '记录每一笔交易背后的逻辑'));
 }
 
