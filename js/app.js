@@ -73,7 +73,13 @@ window.addEventListener('hashchange', () => {
 document.addEventListener('wb:nav', e => go(e.detail));
 
 // ---------- 数据变化时重绘当前视图 ----------
-store.onChange(() => { if (currentId) renderView(currentId); });
+store.onChange(() => {
+  if (!currentId) return;
+  // 焦点在富文本编辑器内时跳过重绘，避免打断输入（内容已由自动保存落库）
+  const ae = document.activeElement;
+  if (ae && ae.closest && ae.closest('.rich-ed')) return;
+  renderView(currentId);
+});
 
 // ---------- 同步状态指示 ----------
 const chips = [document.getElementById('syncChip'), document.getElementById('syncChipM')];
