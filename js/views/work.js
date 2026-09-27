@@ -1,5 +1,5 @@
 // ============ 工作情况：月工作计划 + 日工作完成情况 ============
-import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, todayStr, fmtDateTime, toast, uid, WEEK_CN } from '../util.js';
+import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, todayStr, fmtDateTime, toast, uid, WEEK_CN, richText, stripHtml, richToHtml } from '../util.js';
 import { store } from '../store.js';
 import { exportExcelBook, pickExcelBook, asText, asMonth, asDate, asDone } from '../excel.js';
 
@@ -39,7 +39,7 @@ async function exportPlans() {
     const focus = store.data.work.focus || {};
     if (!plans.length && !Object.keys(focus).length) { toast('还没有计划可导出', 'err'); return; }
     const aoa = [['月份', '计划内容', '备注', '是否完成', '创建时间']];
-    plans.forEach(p => aoa.push([p.month, p.title, p.note || '', p.done ? '已完成' : '未完成', fmtDateTime(p.createdAt)]));
+    plans.forEach(p => aoa.push([p.month, stripHtml(p.title), stripHtml(p.note), p.done ? '已完成' : '未完成', fmtDateTime(p.createdAt)]));
     const focusAoa = [['月份', '当月重点工作']];
     Object.keys(focus).sort().forEach(m => { if (focus[m]) focusAoa.push([m, focus[m]]); });
     await exportExcelBook(`月工作计划-${todayStr()}.xlsx`, [
@@ -106,7 +106,7 @@ async function exportLogs() {
     const logs = [...store.data.work.logs].sort((a, b) => a.date.localeCompare(b.date));
     if (!logs.length) { toast('还没有记录可导出', 'err'); return; }
     const aoa = [['日期', '当日重点工作', '对安装公司', '对土建、业主、监理', '对分包商', '其他', '更新时间']];
-    logs.forEach(l => aoa.push([l.date, l.focus || '', l.install || '', l.civil || '', l.sub || '', l.other || l.content || '', fmtDateTime(l.updatedAt)]));
+    logs.forEach(l => aoa.push([l.date, stripHtml(l.focus), stripHtml(l.install), stripHtml(l.civil), stripHtml(l.sub), stripHtml(l.other || l.content), fmtDateTime(l.updatedAt)]));
     await exportExcelBook(`日工作完成情况-${todayStr()}.xlsx`, [
       { name: '日工作完成情况', aoa, widths: [12, 24, 30, 30, 30, 30, 18] },
     ]);
@@ -170,7 +170,7 @@ function renderPlans(box) {
   const pct = plans.length ? Math.round(doneCnt / plans.length * 100) : 0;
 
   // 当月重点工作输入框
-  const focusTa = el('textarea', { class: 'input', rows: '2', placeholder: '这个月最重要的工作是什么？' }, (store.data.work.focus || {})[curMonth] || '');
+  const focusTa = richText({ placeholder: '这个月最重要的工作是什么？', value: (store.data.work.focus || {})[curMonth] || '', rows: 2 });
 
   box.innerHTML = '';
   box.append(...[
@@ -218,7 +218,7 @@ function renderPlans(box) {
           }, p.done ? icon('check', 13) : null),
           el('div', { class: 'work-main' },
             el('div', { class: 'work-title' }, p.title),
-            p.note ? el('div', { class: 'muted tiny', style: 'margin-top:4px;white-space:pre-wrap' }, p.note) : null),
+            p.note ? el('div', { class: 'muted tiny', style: 'margin-top:4px;white-space:pre-wrap', html: richToHtml(p.note) }) : null),
           el('div', { class: 'work-ops' },
             el('button', { class: 'btn btn-sm', onclick: () => planModal(p) }, icon('edit', 14)),
             el('button', { class: 'btn btn-sm btn-danger', onclick: async () => { if (await confirmBox(`删除计划「${p.title}」？`)) store.update(d => { d.work.plans = d.work.plans.filter(i => i.id !== p.id); }); } }, icon('trash', 14))))))
@@ -255,14 +255,14 @@ function logModal(existing) {
 function logBody(l) {
   const parts = [];
   if (l.focus) {
-    parts.push(el('div', { style: 'margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(34,211,238,.08);border-radius:6px;font-size:13.5px' }, '★ 当日重点：' + l.focus));
+    parts.push(el('div', { style: 'margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(52,211,153,.08);border-radius:6px;font-size:13.5px', html: richToHtml('★ 当日重点：' + l.focus) }));
   }
   const filled = CATS.filter(([k]) => l[k]);
   if (filled.length) {
     parts.push(el('div', { class: 'work-cols' }, filled.map(([k, label]) =>
       el('div', { class: 'work-col' },
         el('div', { class: 'work-col-h' }, label),
-        el('div', { class: 'work-col-b' }, l[k])))));
+        el('div', { class: 'work-col-b', html: richToHtml(l[k]) })))));
   } else if (l.content) {
     parts.push(el('div', { class: 'muted', style: 'font-size:13.5px;margin-top:6px;white-space:pre-wrap' }, l.content));
   }
@@ -271,7 +271,7 @@ function logBody(l) {
 
 // 把分类文本拆成事项条目（去掉“要求完成时间”等噪音行）
 function splitItems(text) {
-  return (text || '').split(/[\n；;]+/).map(s => s.trim())
+  return stripHtml(text || '').split(/[\n；;]+/).map(s => s.trim())
     .filter(s => s.length >= 2 && !/：$/.test(s) && !/^要求完成时间/.test(s) && !/^考核/.test(s));
 }
 
@@ -283,7 +283,7 @@ function genSummary(m) {
   const plans = store.data.work.plans.filter(p => p.month === m);
   const doneCnt = plans.filter(p => p.done).length;
   let out = `本月共 ${logs.length} 天有工作记录。`;
-  if (focus) out += `当月重点工作：${focus}。`;
+  if (focus) out += `当月重点工作：${stripHtml(focus)}。`;
   if (plans.length) out += `月工作计划 ${plans.length} 项，完成 ${doneCnt} 项。`;
   // 各分类事项按日期先后去重收集
   const catItems = CATS.map(([k, label]) => {
@@ -341,7 +341,7 @@ function renderLogs(box) {
   function paintList() {
     const all = [...store.data.work.logs].sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
     const q = logQuery.toLowerCase();
-    const match = l => [l.date, l.focus, ...CATS.map(([k]) => l[k]), l.content].some(s => (s || '').toLowerCase().includes(q));
+    const match = l => [l.date, l.focus, ...CATS.map(([k]) => l[k]), l.content].some(s => stripHtml(s || '').toLowerCase().includes(q));
     const shown = q ? all.filter(match) : all.filter(l => l.date.startsWith(logMonth));
     listBox.innerHTML = '';
     if (!shown.length) {
@@ -362,11 +362,9 @@ function renderLogs(box) {
   searchIn.oninput = () => { logQuery = searchIn.value.trim(); paintList(); };
 
   // 今日快记：当日重点工作 + 四分类
-  const focusIn = el('input', { class: 'input', type: 'text', placeholder: '当日重点工作（选填）' }, '');
-  focusIn.value = todayLog ? (todayLog.focus || '') : '';
+  const focusIn = richText({ placeholder: '当日重点工作（选填）', value: todayLog ? (todayLog.focus || '') : '', rows: 1, single: true });
   const catInputs = CATS.map(([k, label]) => {
-    const ta = el('textarea', { class: 'input', rows: '2', placeholder: label + '…' }, '');
-    ta.value = todayLog ? (todayLog[k] || (k === 'other' ? (todayLog.content || '') : '')) : '';
+    const ta = richText({ placeholder: label + '…', value: todayLog ? (todayLog[k] || (k === 'other' ? (todayLog.content || '') : '')) : '', rows: 2 });
     return { k, label, ta };
   });
 
