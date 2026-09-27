@@ -255,7 +255,7 @@ function logModal(existing) {
 function logBody(l) {
   const parts = [];
   if (l.focus) {
-    parts.push(el('div', { style: 'margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(52,211,153,.08);border-radius:6px;font-size:13.5px', html: richToHtml('★ 当日重点：' + l.focus) }));
+    parts.push(el('div', { style: 'margin-top:6px;padding:8px 10px;border-left:3px solid var(--accent);background:rgba(var(--accent-rgb),.08);border-radius:6px;font-size:13.5px', html: richToHtml('★ 当日重点：' + l.focus) }));
   }
   const filled = CATS.filter(([k]) => l[k]);
   if (filled.length) {
