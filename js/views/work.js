@@ -361,12 +361,32 @@ function renderLogs(box) {
   searchIn.value = logQuery;
   searchIn.oninput = () => { logQuery = searchIn.value.trim(); paintList(); };
 
-  // 今日快记：当日重点工作 + 四分类
-  const focusIn = richText({ placeholder: '当日重点工作（选填）', value: todayLog ? (todayLog.focus || '') : '', rows: 1, single: true });
+  // 今日快记：当日重点工作 + 四分类（输入停顿 1.2s 自动保存，无需手动点保存）
+  const saveStatus = el('span', { class: 'tiny muted', style: 'margin-left:auto;align-self:center' },
+    todayLog ? '' : '输入停顿后自动保存');
+  let saveTimer = null;
+  function doSave(manual) {
+    clearTimeout(saveTimer);
+    const fields = { focus: focusIn.value.trim() };
+    catInputs.forEach(({ k, ta }) => { fields[k] = ta.value.trim(); });
+    if (!Object.values(fields).some(Boolean)) {
+      if (manual) { toast('先写点内容再保存', 'err'); focusIn.focus(); }
+      return;
+    }
+    saveLog(today, fields);
+    const t = new Date(), pad2 = n => String(n).padStart(2, '0');
+    saveStatus.textContent = `已自动保存 ${pad2(t.getHours())}:${pad2(t.getMinutes())}:${pad2(t.getSeconds())}`;
+    if (saveBtn) saveBtn.textContent = '更新今天的记录';
+    if (manual) toast('今天的工作已记录 ✓');
+  }
+  const autoSave = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => doSave(false), 1200); };
+  const focusIn = richText({ placeholder: '当日重点工作（选填）', value: todayLog ? (todayLog.focus || '') : '', rows: 1, single: true, onInput: autoSave });
   const catInputs = CATS.map(([k, label]) => {
-    const ta = richText({ placeholder: label + '…', value: todayLog ? (todayLog[k] || (k === 'other' ? (todayLog.content || '') : '')) : '', rows: 2 });
+    const ta = richText({ placeholder: label + '…', value: todayLog ? (todayLog[k] || (k === 'other' ? (todayLog.content || '') : '')) : '', rows: 2, onInput: autoSave });
     return { k, label, ta };
   });
+  const saveBtn = el('button', { class: 'btn btn-primary', onclick: () => doSave(true) },
+    todayLog ? '更新今天的记录' : '保存今天的记录');
 
   box.innerHTML = '';
   box.append(
@@ -378,19 +398,11 @@ function renderLogs(box) {
           el('div', { class: 'tiny muted', style: 'margin-bottom:4px' }, label),
           ta))),
       el('div', { style: 'display:flex;gap:10px;margin-top:12px;flex-wrap:wrap' },
-        el('button', {
-          class: 'btn btn-primary', onclick: () => {
-            const fields = { focus: focusIn.value.trim() };
-            catInputs.forEach(({ k, ta }) => { fields[k] = ta.value.trim(); });
-            if (!Object.values(fields).some(Boolean)) { toast('先写点内容再保存', 'err'); focusIn.focus(); return; }
-            saveLog(today, fields);
-            toast('今天的工作已记录 ✓');
-            renderLogs(box);
-          }
-        }, todayLog ? '更新今天的记录' : '保存今天的记录'),
+        saveBtn,
         el('button', { class: 'btn', onclick: () => logModal() }, '补记以往日期'),
         el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: exportLogs }, icon('down', 14), '导出 Excel'),
-        el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: () => importLogs(box) }, icon('up', 14), '导入 Excel'))),
+        el('button', { class: 'btn btn-sm', style: XLSX_BTN, onclick: () => importLogs(box) }, icon('up', 14), '导入 Excel'),
+        saveStatus)),
 
     // 往日记录：月份切换 + 月度总结 + 搜索
     el('div', { class: 'card' },
