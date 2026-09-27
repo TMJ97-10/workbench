@@ -156,7 +156,8 @@ export function formModal(title, fields, initial = {}, okLabel = '保存') {
           return el('option', { value: v, selected: String(val) === String(v) ? '' : null }, label);
         }));
     } else if (f.type === 'textarea') {
-      inp = el('textarea', { class: 'input', placeholder: f.placeholder || '', rows: String(f.rows || 4) }, val);
+      // 多行文本升级为富文本（字色 + 段色），旧纯文本数据自动兼容
+      inp = richText({ placeholder: f.placeholder || '', value: val, rows: f.rows || 4 });
     } else {
       inp = el('input', {
         class: 'input', type: f.type || 'text', value: val,
@@ -233,4 +234,145 @@ export function cardTitle(iconName, text, right) {
   return el('div', { class: 'card-title' },
     iconName ? icon(iconName, 17) : null, text,
     right ? el('span', { class: 'right' }, right) : null);
+}
+
+
+// ==================== 富文本：字体颜色 + 段落底色 ====================
+// 全平台所有多行/内容输入框统一走 richText()；旧纯文本数据照常显示，导出/搜索自动剥标签。
+
+/** 色板：8 色，供字体颜色与段落底色共用 */
+export const RICH_COLORS = [
+  ['#F87171', '红'], ['#FB923C', '橙'], ['#FBBF24', '黄'], ['#34D399', '绿'],
+  ['#22D3EE', '青'], ['#60A5FA', '蓝'], ['#A78BFA', '紫'], ['#F472B6', '粉'],
+];
+
+/** HTML → 纯文本（导出 Excel / 搜索 / 月度总结 / 复制 用） */
+export function stripHtml(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  return (d.textContent || '').replace(/ /g, ' ').trim();
+}
+
+/** 存储的 HTML 白名单清理：只保留排版标签与颜色样式，防脚本注入 */
+export function sanitizeHtml(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  const ALLOWED = /^(DIV|P|BR|B|STRONG|I|EM|U|SPAN|BLOCKQUOTE|UL|OL|LI)$/;
+  const kill = [];
+  d.querySelectorAll('*').forEach(n => {
+    if (!ALLOWED.test(n.tagName)) { kill.push(n); return; }
+    [...n.attributes].forEach(a => {
+      if (a.name === 'style') {
+        const st = n.style;
+        const color = st.color, bg = st.backgroundColor;
+        n.removeAttribute('style');
+        if (color) n.style.color = color;
+        if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') n.style.backgroundColor = bg;
+      } else if (a.name !== 'class') n.removeAttribute(a.name);
+    });
+  });
+  kill.forEach(n => n.replaceWith(document.createTextNode(n.textContent)));
+  return d.innerHTML;
+}
+
+/** 显示/入组件前的统一入口：旧纯文本转 <br> 换行；HTML 走白名单清理 */
+export function richToHtml(v) {
+  if (!v) return '';
+  if (!v.includes('<')) {
+    const esc = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc.replace(/\n/g, '<br>');
+  }
+  return sanitizeHtml(v).replace(/\n/g, '<br>');
+}
+
+/** 光标所在的块级元素（段落底色用） */
+function currentBlock(ed) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === 3) node = node.parentNode;
+  let block = node;
+  while (block && block !== ed && !(block.nodeType === 1 && /^(DIV|P|LI|BLOCKQUOTE|H[1-6])$/.test(block.tagName))) block = block.parentNode;
+  return (block && block !== ed) ? block : null;
+}
+
+/**
+ * 富文本输入组件（字色 + 段色）。
+ * 用法：const rt = richText({ placeholder, value, rows, single, onEnter });
+ *   - rt.value 读/写 HTML；rt.focus() 聚焦编辑器；rt 可直接 append 到表单。
+ *   - 字色：选中文字 → 点色块；段色：光标放段落里点色块 = 整段铺底色，选中文字则只标选中部分。
+ */
+export function richText({ placeholder = '', value = '', rows = 3, single = false, onEnter = null } = {}) {
+  const ed = el('div', { class: 'rich-ed input', dataset: { ph: placeholder } });
+  ed.contentEditable = 'true';
+  ed.setAttribute('role', 'textbox');
+  ed.innerHTML = richToHtml(value);
+  ed.style.minHeight = Math.max(38, rows * 26 + 12) + 'px';
+  if (single) ed.dataset.single = '1';
+
+  const applyFore = (c) => {
+    ed.focus();
+    document.execCommand('styleWithCSS', false, true);
+    if (c) document.execCommand('foreColor', false, c);
+    else document.execCommand('removeFormat', false);
+  };
+  const applyBack = (c) => {
+    ed.focus();
+    const sel = window.getSelection();
+    if (sel.rangeCount && !sel.getRangeAt(0).collapsed) {
+      // 有选中文字：只给选中部分铺底色（高亮）
+      document.execCommand('styleWithCSS', false, true);
+      if (!document.execCommand('hiliteColor', false, c || 'transparent')) {
+        document.execCommand('backcolor', false, c || 'transparent');
+      }
+      return;
+    }
+    const block = currentBlock(ed);
+    if (block) block.style.backgroundColor = c; // 空串即清除
+    else if (c) {
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand('hiliteColor', false, c);
+    }
+  };
+
+  const swatch = (c, name, back) => el('button', {
+    class: 'rich-sw' + (back ? ' rich-sw-bd' : ''),
+    type: 'button',
+    title: back ? `${name}底：光标放段落里点 = 整段铺底；选中文字则只标选中部分` : `${name}：选中文字后点我`,
+    style: back ? `border-color:${c}` : `background:${c}`,
+    onclick: () => (back ? applyBack(c) : applyFore(c)),
+  });
+  const clearBtn = (back) => el('button', {
+    class: 'rich-x', type: 'button',
+    title: back ? '清除光标所在段落的底色' : '清除选中文字的字色',
+    onclick: () => (back ? applyBack('') : applyFore('')),
+  }, '✕');
+
+  const bar = el('div', { class: 'rich-bar' },
+    el('span', { class: 'rich-lab' }, '字色'),
+    ...RICH_COLORS.map(([c, n]) => swatch(c, n, false)),
+    clearBtn(false),
+    el('span', { class: 'rich-sep' }),
+    el('span', { class: 'rich-lab' }, '段色'),
+    ...RICH_COLORS.map(([c, n]) => swatch(c, n, true)),
+    clearBtn(true),
+  );
+
+  ed.addEventListener('keydown', (e) => {
+    if (single && e.key === 'Enter') { e.preventDefault(); if (onEnter) onEnter(); }
+  });
+  // 粘贴一律按纯文本插入，避免带入外部样式
+  ed.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, text);
+  });
+
+  const wrap = el('div', { class: 'rich-wrap' }, bar, ed);
+  Object.defineProperty(wrap, 'value', {
+    get: () => ed.innerHTML,
+    set: (v) => { ed.innerHTML = richToHtml(v); },
+  });
+  wrap.focus = () => ed.focus();
+  return wrap;
 }
