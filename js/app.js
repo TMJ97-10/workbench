@@ -1,6 +1,9 @@
 // ============ 应用外壳：导航 / 路由 / 视图调度 ============
-import { el, icon, closeModal } from './util.js';
+import { el, icon, closeModal, setTheme } from './util.js';
 import { store } from './store.js';
+
+// 启动即应用本机保存的外观主题（渲染前执行，避免闪色）
+setTheme((() => { try { return localStorage.getItem('wb-theme'); } catch { return null; } })());
 
 import * as dashboard from './views/dashboard.js';
 import * as todos from './views/todos.js';
