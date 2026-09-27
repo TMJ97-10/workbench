@@ -1,19 +1,21 @@
 // ============ 灵感库（一句话快速记录，卡片流） ============
-import { el, icon, confirmBox, emptyState, viewHead, fmtDateTime, toast } from '../util.js';
+import { el, icon, confirmBox, emptyState, viewHead, fmtDateTime, toast, richText, stripHtml, richToHtml } from '../util.js';
 import { store } from '../store.js';
 
 export function render(root) {
   const d = store.data;
-  const textInp = el('input', { class: 'input', placeholder: '一句话灵感，想到就记…', maxlength: '200' });
   const tagInp = el('input', { class: 'input', style: 'max-width:220px', placeholder: '标签（可选，逗号分隔）' });
+  let textInp;
   const submit = () => {
-    const text = textInp.value.trim();
+    const text = stripHtml(textInp.value);
     if (!text) { toast('先写点什么吧', 'err'); textInp.focus(); return; }
+    if (text.length > 200) { toast('灵感太长，控制在 200 字以内', 'err'); return; }
     const tags = tagInp.value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-    store.update(dd => dd.inspirations.unshift({ id: 'i' + Math.random().toString(36).slice(2, 9), text, tags, createdAt: Date.now() }));
+    store.update(dd => dd.inspirations.unshift({ id: 'i' + Math.random().toString(36).slice(2, 9), text: textInp.value.trim(), tags, createdAt: Date.now() }));
     toast('灵感已收藏 ✨', 'ok');
+    textInp.value = '';
   };
-  textInp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  textInp = richText({ placeholder: '一句话灵感，想到就记…（选中文字可变色，回车保存）', single: true, rows: 1, onEnter: submit });
 
   const list = [...d.inspirations].sort((a, b) => b.createdAt - a.createdAt);
 
@@ -26,7 +28,7 @@ export function render(root) {
         el('button', { class: 'btn btn-green', onclick: submit }, icon('bulb', 15), '记下来'))),
     list.length
       ? el('div', { class: 'idea-grid' }, list.map(idea => el('div', { class: 'idea-card' },
-        el('div', { class: 'tx' }, idea.text),
+        el('div', { class: 'tx', html: richToHtml(idea.text) }),
         el('div', { class: 'meta' },
           (idea.tags || []).map(t => el('span', { class: 'tag green' }, '#' + t)),
           el('span', { class: 'num', style: 'margin-left:auto' }, fmtDateTime(idea.createdAt)),
