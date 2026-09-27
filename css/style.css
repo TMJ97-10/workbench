@@ -1,46 +1,38 @@
 /* 个人工作台 · 全局样式（深色科技感） */
 :root{
-  --bg:#0B0F17;
-  --bg-2:#0E1420;
-  --panel:#121826;
-  --panel-2:#0E1524;
-  --border:rgba(148,163,184,.14);
-  --border-2:rgba(148,163,184,.2);
-  --text:#E5EAF3;
-  --text-2:#9AA4B8;
-  --text-3:#5D6B83;
+  --bg:#F3F5F9;
+  --bg-2:#FFFFFF;
+  --panel:#FFFFFF;
+  --panel-2:#EDF1F7;
+  --border:rgba(15,23,42,.1);
+  --border-2:rgba(15,23,42,.18);
+  --text:#0F172A;
+  --text-2:#475569;
+  --text-3:#94A3B8;
   --accent:#34D399;   /* 主色（默认：翡翠绿） */
   --accent2:#22D3EE;  /* 辅色 */
   --accent-rgb:52, 211, 153;
   --accent2-rgb:34, 211, 238;
   --accent-dim:rgba(var(--accent-rgb),.14);
   --accent2-dim:rgba(var(--accent2-rgb),.14);
-  --btn-bg:rgba(148,163,184,.06);
-  --hover-bg:rgba(148,163,184,.08);
-  --toast-bg:#1A2436;
-  --scroll:#1E2A3E;
-  --tabbar-bg:rgba(11,15,23,.92);
-  color-scheme:dark;
+  --btn-bg:rgba(15,23,42,.05);
+  --hover-bg:rgba(15,23,42,.07);
+  --toast-bg:#FFFFFF;
+  --scroll:#C6CFDC;
+  --tabbar-bg:rgba(255,255,255,.94);
+  color-scheme:light;
 }
 /* ---- 主题配色（设置页「外观设置」切换；不写 data-theme 时即默认翡翠绿） ---- */
-[data-theme="green"]{--bg:#0A100E;--bg-2:#0C1512;--panel:#122019;--panel-2:#0E1A15;}
-[data-theme="cyan"]{--accent:#22D3EE;--accent2:#34D399;--accent-rgb:34, 211, 238;--accent2-rgb:52, 211, 153;--bg:#08131C;--bg-2:#0A1826;--panel:#0F1E2E;--panel-2:#0B1A29;}
-[data-theme="blue"]{--accent:#60A5FA;--accent2:#22D3EE;--accent-rgb:96, 165, 250;--accent2-rgb:34, 211, 238;--bg:#0A1020;--bg-2:#0D1526;--panel:#131F36;--panel-2:#0E1930;}
-[data-theme="violet"]{--accent:#A78BFA;--accent2:#F472B6;--accent-rgb:167, 139, 250;--accent2-rgb:244, 114, 182;--bg:#120E1E;--bg-2:#161128;--panel:#1D1733;--panel-2:#171230;}
-[data-theme="orange"]{--accent:#FB923C;--accent2:#FBBF24;--accent-rgb:251, 146, 60;--accent2-rgb:251, 191, 36;--bg:#171009;--bg-2:#1D130C;--panel:#261A10;--panel-2:#1E150C;}
-[data-theme="light"]{
-  --bg:#F3F5F9;--bg-2:#FFFFFF;--panel:#FFFFFF;--panel-2:#EDF1F7;
-  --border:rgba(15,23,42,.1);--border-2:rgba(15,23,42,.18);
-  --text:#0F172A;--text-2:#475569;--text-3:#94A3B8;
-  --accent:#0891B2;--accent2:#059669;
-  --accent-rgb:8, 145, 178;--accent2-rgb:5, 150, 105;
-  --btn-bg:rgba(15,23,42,.05);--hover-bg:rgba(15,23,42,.07);
-  --toast-bg:#FFFFFF;--scroll:#C6CFDC;--tabbar-bg:rgba(255,255,255,.94);
-  color-scheme:light;
-  --up:#F43F5E;      /* A股红涨 */
-  --down:#10B981;    /* A股绿跌 */
-  --warn:#FBBF24;
-}
+[data-theme="green"]{--accent:#34D399;--accent2:#22D3EE;--accent-rgb:52, 211, 153;--accent2-rgb:34, 211, 238;}
+[data-theme="cyan"]{--accent:#22D3EE;--accent2:#34D399;--accent-rgb:34, 211, 238;--accent2-rgb:52, 211, 153;}
+[data-theme="blue"]{--accent:#60A5FA;--accent2:#22D3EE;--accent-rgb:96, 165, 250;--accent2-rgb:34, 211, 238;}
+[data-theme="violet"]{--accent:#A78BFA;--accent2:#F472B6;--accent-rgb:167, 139, 250;--accent2-rgb:244, 114, 182;}
+[data-theme="orange"]{--accent:#FB923C;--accent2:#FBBF24;--accent-rgb:251, 146, 60;--accent2-rgb:251, 191, 36;}
+[data-theme="light"]{--accent:#0891B2;--accent2:#059669;--accent-rgb:8, 145, 178;--accent2-rgb:5, 150, 105;}
+/* 全部主题统一浅色底（白底），仅强调色不同 */
+[data-theme]{--bg:#F3F5F9;--bg-2:#FFFFFF;--panel:#FFFFFF;--panel-2:#EDF1F7;--border:rgba(15,23,42,.1);--border-2:rgba(15,23,42,.18);--text:#0F172A;--text-2:#475569;--text-3:#94A3B8;--btn-bg:rgba(15,23,42,.05);--hover-bg:rgba(15,23,42,.07);--toast-bg:#FFFFFF;--scroll:#C6CFDC;--tabbar-bg:rgba(255,255,255,.94);color-scheme:light;}
+/* 语义色常量（任何主题下不变） */
+:root{--up:#F43F5E;--down:#10B981;--warn:#FBBF24;}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 body{
