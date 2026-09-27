@@ -23,10 +23,11 @@
   color-scheme:dark;
 }
 /* ---- 主题配色（设置页「外观设置」切换；不写 data-theme 时即默认翡翠绿） ---- */
-[data-theme="cyan"]{--accent:#22D3EE;--accent2:#34D399;--accent-rgb:34, 211, 238;--accent2-rgb:52, 211, 153;}
-[data-theme="blue"]{--accent:#60A5FA;--accent2:#22D3EE;--accent-rgb:96, 165, 250;--accent2-rgb:34, 211, 238;}
-[data-theme="violet"]{--accent:#A78BFA;--accent2:#F472B6;--accent-rgb:167, 139, 250;--accent2-rgb:244, 114, 182;}
-[data-theme="orange"]{--accent:#FB923C;--accent2:#FBBF24;--accent-rgb:251, 146, 60;--accent2-rgb:251, 191, 36;}
+[data-theme="green"]{--bg:#0A100E;--bg-2:#0C1512;--panel:#122019;--panel-2:#0E1A15;}
+[data-theme="cyan"]{--accent:#22D3EE;--accent2:#34D399;--accent-rgb:34, 211, 238;--accent2-rgb:52, 211, 153;--bg:#08131C;--bg-2:#0A1826;--panel:#0F1E2E;--panel-2:#0B1A29;}
+[data-theme="blue"]{--accent:#60A5FA;--accent2:#22D3EE;--accent-rgb:96, 165, 250;--accent2-rgb:34, 211, 238;--bg:#0A1020;--bg-2:#0D1526;--panel:#131F36;--panel-2:#0E1930;}
+[data-theme="violet"]{--accent:#A78BFA;--accent2:#F472B6;--accent-rgb:167, 139, 250;--accent2-rgb:244, 114, 182;--bg:#120E1E;--bg-2:#161128;--panel:#1D1733;--panel-2:#171230;}
+[data-theme="orange"]{--accent:#FB923C;--accent2:#FBBF24;--accent-rgb:251, 146, 60;--accent2-rgb:251, 191, 36;--bg:#171009;--bg-2:#1D130C;--panel:#261A10;--panel-2:#1E150C;}
 [data-theme="light"]{
   --bg:#F3F5F9;--bg-2:#FFFFFF;--panel:#FFFFFF;--panel-2:#EDF1F7;
   --border:rgba(15,23,42,.1);--border-2:rgba(15,23,42,.18);
