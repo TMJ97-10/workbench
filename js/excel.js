@@ -64,7 +64,7 @@ export function pickExcelBook() {
   });
 }
 
-// ---------------- 单元格值解析（兼容文字 / 日期 / Excel 数字日期） ----------------
+// ---------------- 单元格值解析（兼容文字 / 日期 / Excel 数字日期 / 富文本 HTML） ----------------
 const pad = n => String(n).padStart(2, '0');
 
 // Excel 日期常带小数秒误差（如 23:59:17），先四舍五入到最近的整天再取年月日
@@ -73,7 +73,12 @@ function dayRound(v) { return new Date(Math.round(v.getTime() / 86400000) * 8640
 export function asText(v) {
   if (v == null) return '';
   if (v instanceof Date) { const d = dayRound(v); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
-  return String(v).trim();
+  // 富文本字段（HTML）：先剥标签还原纯文本，保证导出/导入往返一致
+  return String(v)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .trim();
 }
 
 function dateFromSerial(n) { // Excel 日期序列号 → Date（按 1900 日期系统）
