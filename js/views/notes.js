@@ -1,5 +1,5 @@
 // ============ 笔记（列表 + 编辑器 两栏） ============
-import { el, icon, confirmBox, emptyState, viewHead, fmtDateTime, toast } from '../util.js';
+import { el, icon, confirmBox, emptyState, viewHead, fmtDateTime, toast, richText, stripHtml } from '../util.js';
 import { store } from '../store.js';
 
 let selectedId = null;
@@ -9,7 +9,7 @@ export function render(root) {
   const d = store.data;
   const kw = keyword.trim().toLowerCase();
   let list = [...d.notes].sort((a, b) => b.updatedAt - a.updatedAt);
-  if (kw) list = list.filter(n => (n.title + n.body + (n.tags || []).join(',')).toLowerCase().includes(kw));
+  if (kw) list = list.filter(n => (n.title + stripHtml(n.body) + (n.tags || []).join(',')).toLowerCase().includes(kw));
 
   if (selectedId && !d.notes.find(n => n.id === selectedId)) selectedId = null;
   if (!selectedId && list.length) selectedId = list[0].id;
@@ -28,7 +28,7 @@ export function render(root) {
         onclick: () => { selectedId = n.id; rerender(root); }
       },
         el('div', { class: 'nt' }, n.title || '（无标题）'),
-        el('div', { class: 'np' }, (n.body || '').slice(0, 40) || '无内容'),
+        el('div', { class: 'np' }, stripHtml(n.body).slice(0, 40) || '无内容'),
         el('div', { style: 'display:flex;gap:5px;margin-top:6px;flex-wrap:wrap' },
           (n.tags || []).map(t => el('span', { class: 'tag gray' }, '#' + t)),
           el('span', { class: 'tiny muted', style: 'margin-left:auto' }, fmtDateTime(n.updatedAt).slice(5))))))
@@ -42,7 +42,7 @@ export function render(root) {
   } else {
     const titleInp = el('input', { class: 'input', style: 'font-weight:600;font-size:16px', placeholder: '标题', value: cur.title });
     const tagsInp = el('input', { class: 'input', placeholder: '标签，用逗号分隔（如：工作, 想法）', value: (cur.tags || []).join(', ') });
-    const bodyInp = el('textarea', { class: 'input', rows: '14', style: 'min-height:280px', placeholder: '正文…' }, cur.body);
+    const bodyInp = richText({ placeholder: '正文…（选中文字点色块改字色；光标放段落里点色块 = 段落底色）', value: cur.body, rows: 14 });
     editor = el('div', { class: 'card' },
       el('div', { class: 'field' }, el('label', {}, '标题'), titleInp),
       el('div', { class: 'field' }, el('label', {}, '标签'), tagsInp),
