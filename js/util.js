@@ -237,6 +237,13 @@ export function cardTitle(iconName, text, right) {
 }
 
 
+// ---------- 外观主题（设置页「外观设置」切换；保存在本机 localStorage，默认翡翠绿） ----------
+export function setTheme(id) {
+  if (!id) id = 'green';
+  document.documentElement.dataset.theme = id;
+  try { localStorage.setItem('wb-theme', id); } catch {}
+}
+
 // ==================== 富文本：字体颜色 + 段落底色 ====================
 // 全平台所有多行/内容输入框统一走 richText()；旧纯文本数据照常显示，导出/搜索自动剥标签。
 
