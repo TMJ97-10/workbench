@@ -1,5 +1,5 @@
 // ============ AI 助手入口 + 提示词收藏夹 ============
-import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, toast } from '../util.js';
+import { el, icon, formModal, confirmBox, emptyState, viewHead, cardTitle, toast, stripHtml, richToHtml } from '../util.js';
 import { store } from '../store.js';
 
 const AIS = [
@@ -52,8 +52,8 @@ export function render(root) {
         ? el('div', {}, d.prompts.map(p => el('div', { class: 'prompt-item' },
           el('div', { class: 'grow', style: 'min-width:0' },
             el('div', { class: 'pt' }, p.title),
-            el('div', { class: 'pp', title: p.content }, p.content)),
-          el('button', { class: 'btn btn-sm', onclick: () => copyText(p.content) }, icon('copy', 14), '复制'),
+            el('div', { class: 'pp', title: stripHtml(p.content), html: richToHtml(p.content) })),
+          el('button', { class: 'btn btn-sm', onclick: () => copyText(stripHtml(p.content)) }, icon('copy', 14), '复制'),
           el('button', { class: 'icon-btn', title: '编辑', onclick: () => promptModal(p) }, icon('edit', 15)),
           el('button', {
             class: 'icon-btn danger', title: '删除',
