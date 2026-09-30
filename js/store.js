@@ -82,43 +82,57 @@ export const store = {
     this.schedulePush();
   },
 
-  /** 用远端数据合并到本地：按模块取并集，同键以远端为准；任何一方已有的内容都不会丢 */
+  /** 用远端数据合并到本地：按模块取并集；同键冲突时以「时间戳较新者」为准，
+      避免本地刚保存（尚未推送云端）的内容被云端旧数据回滚 */
   replaceFromRemote(remote) {
     const local = loadLocal(); // 借用深合并逻辑，保证字段齐全
-    const byId = (l = [], r = []) => {
+    const tsOf = x => (x && (x.updatedAt || x.createdAt)) || 0;
+    const byIdNewer = (l = [], r = []) => {
       const map = new Map();
       l.forEach(x => x && x.id != null && map.set(x.id, x));
-      r.forEach(x => x && x.id != null && map.set(x.id, x)); // 远端覆盖同 id
+      r.forEach(x => {
+        if (!x || x.id == null) return;
+        const old = map.get(x.id);
+        if (!old || tsOf(x) >= tsOf(old)) map.set(x.id, x);
+      });
       return [...map.values()];
     };
-    const byKey = (key) => (l = [], r = []) => {
+    const byKeyNewer = (key) => (l = [], r = []) => {
       const map = new Map();
       l.forEach(x => x && x[key] != null && map.set(x[key], x));
-      r.forEach(x => x && x[key] != null && map.set(x[key], x));
+      r.forEach(x => {
+        if (!x || x[key] == null) return;
+        const old = map.get(x[key]);
+        if (!old || tsOf(x) >= tsOf(old)) map.set(x[key], x);
+      });
       return [...map.values()];
     };
     const rl = remote.learning || {}, rs = remote.stocks || {}, rw = remote.work || {};
     const merged = {
       ...local, ...remote,
       meta: { ...local.meta, ...(remote.meta || {}), updatedAt: Math.max(local.meta?.updatedAt || 0, remote.meta?.updatedAt || 0) },
-      todos: byId(local.todos, remote.todos),
-      events: byId(local.events, remote.events),
-      notes: byId(local.notes, remote.notes),
-      inspirations: byId(local.inspirations, remote.inspirations),
-      prompts: byId(local.prompts, remote.prompts),
-      ledger: byId(local.ledger, remote.ledger),
+      todos: byIdNewer(local.todos, remote.todos),
+      events: byIdNewer(local.events, remote.events),
+      notes: byIdNewer(local.notes, remote.notes),
+      inspirations: byIdNewer(local.inspirations, remote.inspirations),
+      prompts: byIdNewer(local.prompts, remote.prompts),
+      ledger: byIdNewer(local.ledger, remote.ledger),
       learning: {
-        plans: byId(local.learning.plans, rl.plans),
+        plans: byIdNewer(local.learning.plans, rl.plans),
         checkins: [...new Set([...(local.learning.checkins || []), ...(rl.checkins || [])])].sort(),
       },
       stocks: {
-        trades: byId(local.stocks.trades, rs.trades),
-        watchlist: byKey('code')(local.stocks.watchlist, rs.watchlist),
-        notes: byId(local.stocks.notes, rs.notes),
+        trades: byIdNewer(local.stocks.trades, rs.trades),
+        watchlist: (() => {
+          const map = new Map();
+          [...local.stocks.watchlist, ...(rs.watchlist || [])].forEach(x => x && x.code != null && map.set(x.code, x));
+          return [...map.values()];
+        })(),
+        notes: byIdNewer(local.stocks.notes, rs.notes),
       },
       work: {
-        plans: byId(local.work.plans, rw.plans),
-        logs: byKey('date')(local.work.logs, rw.logs), // 日志按日期合并，同日期以远端为准
+        plans: byIdNewer(local.work.plans, rw.plans),
+        logs: byKeyNewer('date')(local.work.logs, rw.logs), // 同日期取 updatedAt 较新一方
         focus: { ...(local.work.focus || {}), ...(rw.focus || {}) },
       },
       settings: { ...(local.settings || {}), ...(remote.settings || {}) },
